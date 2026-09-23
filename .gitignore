@@ -1,0 +1,7 @@
+# Personal learning context. Kept out of commits by default.
+/devpost/learner-profile.md
+
+# Local credentials. A secret-free example file can still be committed.
+.env
+.env.*
+!.env.example
