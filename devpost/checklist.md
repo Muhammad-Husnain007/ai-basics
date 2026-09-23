@@ -29,7 +29,7 @@ Build mode: fast
   Learner check: Trigger the sample crash and confirm the terminal shows the replicate line, the formulating line, and a target file whose Jest suite now passes.
   Commit: `Verify crash with Jest and apply stubbed discount patch`
 
-- [ ] **3. A passing re-run opens one GitHub pull request, or logs the credential error and stops**
+- [x] **3. A passing re-run opens one GitHub pull request, or logs the credential error and stops**
   Becomes usable: After the second Jest run passes, DevLens opens one pull request on a new branch and prints its URL, or prints the credential error and opens nothing. The pull request body includes the issue, the root cause, and the passing Jest output.
   Why now: The kernel's visible beat is the pull request. It comes after a fix that has already passed, so a bad patch cannot open one. Nothing else follows it.
   PRD ref: `prd.md > Verify the fix and open a pull request`, `prd.md > Abort without a pull request`
@@ -64,3 +64,4 @@ Activity mode: not started
 
 - Patch generation is a labeled stub of the sample discount fix instead of a live GPT-4o call — OpenAI returned `credit_balance_exhausted`, and the learner chose not to add credits.
 - The early hands-on pause after slice 2 was skipped — the learner asked to commit the stub and proceed immediately to Slice 3.
+- Passing Jest output is read from both stdout and stderr — a successful `npx jest` wrote the summary to stderr, so the first pull request body had an empty test section.

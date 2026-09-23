@@ -62,7 +62,7 @@ A regex over the stack string. It returns `filePath` and `lineNumber`, or nothin
 PRD ref: `prd.md > Receive a crash webhook`.
 
 ### Test runner
-`execSync('npx jest', { cwd: targetRepoPath })`. The first call must exit non-zero to continue. The second call must exit zero to continue. Captured stdout and stderr are what the pull request calls the passing test results.
+`npx jest` runs in the target repo. The first call must exit non-zero to continue. The second call must exit zero to continue. Stdout and stderr from that run are what the pull request calls the passing test results.
 PRD ref: `prd.md > Replicate the crash with unit tests`, `prd.md > Verify the fix and open a pull request`.
 
 ### Patch generator

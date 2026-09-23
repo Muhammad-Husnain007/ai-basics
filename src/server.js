@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { parseStack } from "./parseStack.js";
 import { runTests } from "./runTests.js";
 import { generatePatch, restoreFile } from "./generatePatch.js";
+import { openPullRequest } from "./openPullRequest.js";
 
 function loadEnvFile() {
   const envPath = path.resolve(".env");
@@ -79,11 +80,27 @@ export function createApp() {
         return;
       }
 
-      res.status(200).json({ aborted: null, verified: true });
-    } catch (error) {
+      try {
+        const pullRequestUrl = await openPullRequest({
+          targetRepoPath,
+          filePath: parsed.filePath,
+          message,
+          stack,
+          lineNumber: parsed.lineNumber,
+          testOutput: second.output,
+        });
+        console.log(`[DevLens Agent] Fix verified! Pull Request opened: ${pullRequestUrl}.`);
+        res.status(200).json({ aborted: null, verified: true, pullRequestUrl });
+      } catch {
+        console.log(
+          "[DevLens Agent] Error: Fix verified locally, but failed to open GitHub Pull Request. Check API credentials."
+        );
+        res.status(200).json({ aborted: "github" });
+      }
+    } catch {
       if (original !== null) restoreFile(parsed.filePath, original);
       console.log("[DevLens Agent] Error: Generated fix failed unit tests. Aborting PR creation.");
-      res.status(200).json({ aborted: "fix", reason: error.code ?? "patch" });
+      res.status(200).json({ aborted: "fix" });
     }
   });
 
