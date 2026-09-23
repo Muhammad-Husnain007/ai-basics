@@ -6,9 +6,9 @@ status: approved
 # DevLens — Technical Spec
 
 ## How This Works, In Plain Language
-DevLens is a small local Node program. An Express route waits for a crash webhook. A regex reads the stack trace and pulls out a file path and a line number. The program runs `npx jest` in the target repo and expects that run to fail. It sends the buggy file to one model, GPT-4o, through the OpenAI Node SDK, writes the returned patch onto the local file, and runs `npx jest` again. Only a passing second run is allowed to continue. `@octokit/rest` then creates a branch, commits that patched file, and opens a GitHub pull request. The terminal prints the exact `[DevLens Agent]` lines from the PRD. If parsing, the first test run, the second test run, or the GitHub call fails, the process logs the matching error and stops with no pull request.
+DevLens is a small local Node program. An Express route waits for a crash webhook. A regex reads the stack trace and pulls out a file path and a line number. The program runs `npx jest` in the target repo and expects that run to fail. It writes a labeled stub of the sample discount fix onto the local file and runs `npx jest` again. Live GPT-4o is not called. Only a passing second run is allowed to continue. `@octokit/rest` then creates a branch, commits that patched file, and opens a GitHub pull request. The terminal prints the exact `[DevLens Agent]` lines from the PRD. If parsing, the first test run, the second test run, or the GitHub call fails, the process logs the matching error and stops with no pull request.
 
-This stays one process on one machine, talking to two outside APIs. A queue, a dashboard, and a second model client are not part of the proof.
+This stays one process on one machine, talking to the GitHub API. A queue, a dashboard, and a live model client are not part of the proof.
 
 ## The Core Journey Through the System
 PRD ref: `prd.md > The Core Journey`.
@@ -18,7 +18,7 @@ PRD ref: `prd.md > The Core Journey`.
 3. The stack parser runs the regex. If it cannot produce a file path and line number, the route logs `[DevLens Agent] Error: Unable to parse file and line number from crash payload.` and returns. No tests, no model call, no pull request. PRD ref: `prd.md > Receive a crash webhook`, `prd.md > Abort without a pull request`.
 4. Otherwise the route logs the error message, the stack, and the parsed file and line.
 5. The test runner logs `[DevLens Agent] Running local unit tests (Jest) to replicate bug....` and runs `npx jest` in the target repo. A zero exit means the crash was not replicated: log `[DevLens Agent] Error: Unable to replicate crash with existing test suite.` and stop. PRD ref: `prd.md > Replicate the crash with unit tests`.
-6. A non-zero exit logs `[DevLens Agent] Formulating AI fix patch & re-running tests....` The patch generator reads the target file and asks GPT-4o for a replacement. The program writes that file locally.
+6. A non-zero exit logs `[DevLens Agent] Formulating AI fix patch & re-running tests....` The patch generator reads the target file and, for this proof, applies the labeled discount stub. The program writes that file locally.
 7. The test runner runs `npx jest` again. A non-zero exit restores the original file, logs `[DevLens Agent] Error: Generated fix failed unit tests. Aborting PR creation.`, and stops.
 8. A zero exit means the fix is verified locally. The GitHub publisher creates a branch, commits the patched file, and opens a pull request. If that call fails, restore nothing further on GitHub, log `[DevLens Agent] Error: Fix verified locally, but failed to open GitHub Pull Request. Check API credentials.`, and stop. The local verified file can remain, because the tests already passed.
 9. On success the route logs `[DevLens Agent] Fix verified! Pull Request opened: <PR_URL>.` The pull request body contains the issue description, the root cause, and the passing Jest result. PRD ref: `prd.md > Verify the fix and open a pull request`.
@@ -26,13 +26,13 @@ PRD ref: `prd.md > The Core Journey`.
 ## Stack
 - Node.js and npm. The version on the machine is unverified; confirm it at the start of the build.
 - Express, for `POST /webhook/crash`. https://expressjs.com/
-- OpenAI Node SDK calling GPT-4o. https://github.com/openai/openai-node — the learner named this first, and also named Claude 3.5 Sonnet and Gemini. This draft wires one client only. See **Decisions and Open Issues**.
+- No OpenAI SDK in this proof. The patch step is a labeled stub of the sample discount fix. See **Decisions and Open Issues**.
 - `node:child_process` `execSync` to run `npx jest`. https://nodejs.org/api/child_process.html
 - Jest, inside the target repo. https://jestjs.io/
 - `@octokit/rest` for the branch, the commit, and the pull request. https://octokit.github.io/rest.js/
-- `GITHUB_TOKEN` for GitHub. `OPENAI_API_KEY` for GPT-4o. Both come from the environment. Never commit them.
+- `GITHUB_TOKEN` for GitHub. It comes from the environment. Never commit it.
 
-Package versions are whatever npm installs at build time. Confirm the GPT-4o model id and the Octokit contents/git APIs against current docs before the first live call.
+Package versions are whatever npm installs at build time. Confirm the Octokit contents and git APIs against current docs before the first live call.
 
 ## Where It Runs and How Someone Tries It
 Local Node process. No hosting. The demo video is a screen recording of the terminal and the GitHub pull request. The public GitHub repository is the submission repo. Deployment is not part of this proof.
@@ -66,7 +66,7 @@ PRD ref: `prd.md > Receive a crash webhook`.
 PRD ref: `prd.md > Replicate the crash with unit tests`, `prd.md > Verify the fix and open a pull request`.
 
 ### Patch generator
-Reads the file at the parsed path. Sends the error name, message, stack, file path, line number, and file text to GPT-4o. Writes the returned file text over that local file. If a later Jest run fails, it writes the original text back.
+Reads the file at the parsed path. This proof does not call GPT-4o. A labeled stub recognizes the sample discount bug (`price + price * rate`) and writes the same file with that sum changed to a difference. Any other file is treated as an unusable patch and is not written. If a later Jest run fails, the original text is written back.
 PRD ref: `prd.md > Verify the fix and open a pull request`, `prd.md > Abort without a pull request`.
 
 ### GitHub publisher
@@ -93,13 +93,13 @@ The parser adds `filePath` and `lineNumber` in memory. The patched file lives on
 
 ```
 devlens-ai-agent/
-├── package.json              # express, openai, @octokit/rest
+├── package.json              # express, @octokit/rest
 ├── .env.example              # OPENAI_API_KEY, GITHUB_TOKEN names only
 ├── src/
 │   ├── server.js             # Express and POST /webhook/crash
 │   ├── parseStack.js         # regex → filePath, lineNumber
 │   ├── runTests.js           # execSync npx jest
-│   ├── generatePatch.js      # GPT-4o call and local file write/restore
+│   ├── generatePatch.js      # labeled stub of the discount fix, plus restore
 │   └── openPullRequest.js    # Octokit branch, commit, pull request
 ├── sample-target/            # the one demo repository
 │   ├── package.json          # express, jest
@@ -109,7 +109,7 @@ devlens-ai-agent/
 ```
 
 ## External Services and Dependencies
-- OpenAI chat completions for GPT-4o, via the Node SDK. Key: `OPENAI_API_KEY`. Paid per token. Docs: https://platform.openai.com/docs/models/gpt-4o and https://github.com/openai/openai-node
+- Patch generation is simulated for the sample discount bug. OpenAI was not used after the API returned `credit_balance_exhausted`. Docs for the model that was planned: https://platform.openai.com/docs/models/gpt-4o
 - GitHub REST, via `@octokit/rest`: get the default branch ref, create a ref for the new branch, commit the file on that branch, create the pull request. Key: `GITHUB_TOKEN`. Docs: https://docs.github.com/en/rest and https://octokit.github.io/rest.js/
 - The target repo must already exist on GitHub and match the local `targetRepoPath`, so the branch can be pushed through the API. Owner and repo come from that local git remote, or from env values `GITHUB_OWNER` and `GITHUB_REPO` if the remote cannot be read. Confirm which one works on the first build step.
 
@@ -120,7 +120,7 @@ devlens-ai-agent/
 - **Octokit cannot open the pull request** → `[DevLens Agent] Error: Fix verified locally, but failed to open GitHub Pull Request. Check API credentials.` Stop. No pull request.
 
 ## What Was Simplified and Why
-- **One OpenAI client** instead of GPT-4o, Claude 3.5 Sonnet, and Gemini together — the learner named all three in one line. One key and one SDK can still show a verified pull request. Wiring three clients would add keys and failure modes without a new demo beat.
+- **A labeled stub of the discount fix** instead of a live GPT-4o call — the learner chose this after OpenAI returned `credit_balance_exhausted` and they declined to add credits. The Jest gate and the GitHub pull request stay real. A live model call would need a funded API key.
 - **`execSync` inside the webhook request** instead of a job queue — the terminal can print each line in order while the demo is recorded. A queue would hide that timing.
 - **A regex** instead of a source-map stack parser — the learner chose regex. It only has to read a Node stack from the sample target.
 - **A `sample-target/` app in this project** instead of a separate production service — the payload still carries `targetRepoPath`. One folder is enough to record the video.
@@ -131,7 +131,7 @@ devlens-ai-agent/
 - Learner choice: regex parser for `filePath` and `lineNumber`. Tradeoff: stack formats that do not match the regex abort. The exact pattern is checked against a real Node stack in the build.
 - Learner choice: `child_process.execSync` running `npx jest` before the patch (must fail) and after (must pass). Tradeoff: the full suite runs twice, and the webhook waits until Jest finishes.
 - Learner choice: `@octokit/rest` plus `GITHUB_TOKEN` to create the branch, commit the patch, and open the pull request. Tradeoff: the token and the GitHub repo must allow that, and a local `git` CLI is not the publisher.
-- Learner choice: a simple Node SDK call for the patch. They named OpenAI GPT-4o, and also Claude 3.5 Sonnet and Gemini. On approval they confirmed GPT-4o only, through the OpenAI SDK, with `OPENAI_API_KEY`. Claude and Gemini stay unwired.
+- Learner choice, revised during the build: do not call GPT-4o. Return the known discount fix from a stub in `src/generatePatch.js`. Tradeoff: the proof no longer shows a model writing the patch. Jest still decides whether that patch is kept.
 - Derived from those choices: restore the original file when the second Jest run fails; put the passing Jest output in the pull request body; keep a `sample-target/` app so the demo has a real crash.
 - No learner uncertainty was identified beyond the three model names in one sentence. Nothing else from `prd.md > Open Questions`; that section is empty.
-- Resolved on approval: this proof calls GPT-4o only.
+- Resolved during the build: this proof does not call GPT-4o. The sample patch is simulated and labeled.

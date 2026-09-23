@@ -19,15 +19,15 @@ Build mode: fast
   Learner check: Start the server, send one real sample crash and one stack with no file or line, and confirm the two terminal lines match what you specified.
   Commit: `Log parsed crash file and line from webhook`
 
-- [ ] **2. Jest must fail, then GPT-4o must make the suite pass, or the original file comes back**
-  Becomes usable: A parsed crash runs `npx jest`. A passing suite aborts with the unable-to-replicate line. A failing suite asks GPT-4o for a patch, re-runs Jest, and either leaves the fixed file in place or restores the original and logs the failed-fix line.
-  Why now: This is the verification half of the kernel. The model call is the risky dependency, and it should prove itself on a real failing test before GitHub is involved.
+- [x] **2. Jest must fail, then the labeled discount stub must make the suite pass, or the original file comes back**
+  Becomes usable: A parsed crash runs `npx jest`. A passing suite aborts with the unable-to-replicate line. A failing suite applies the labeled discount stub, re-runs Jest, and either leaves the fixed file in place or restores the original and logs the failed-fix line.
+  Why now: This is the verification half of the kernel. The live model call could not be funded, so the learner replaced it with a labeled stub that still has to pass Jest before GitHub is involved.
   PRD ref: `prd.md > Replicate the crash with unit tests`, `prd.md > Verify the fix and open a pull request`, `prd.md > Abort without a pull request`
   Spec ref: `spec.md > Test runner`, `spec.md > Patch generator`, `spec.md > Important Failure Modes`
-  Build: Add `src/runTests.js` and `src/generatePatch.js`. Wire them after a successful parse. Require `OPENAI_API_KEY` for the model call. On a second Jest failure, write the original file back.
-  Verify (mechanical): Confirm `npx jest` in `sample-target/` exits non-zero before the run. POST the sample crash with `OPENAI_API_KEY` set and confirm the formulating line, a second Jest exit of zero, and a changed target file. POST a target whose Jest suite already passes and confirm `[DevLens Agent] Error: Unable to replicate crash with existing test suite.` with no model call and no pull request.
-  Learner check: Put your OpenAI key in `.env`, trigger the sample crash, and confirm the terminal shows the replicate line, the formulating line, and a target file whose Jest suite now passes.
-  Commit: `Verify crash with Jest and apply GPT-4o patch`
+  Build: Add `src/runTests.js` and `src/generatePatch.js`. Wire them after a successful parse. The patch generator is a labeled stub of the discount fix, not a live model call. On a second Jest failure, write the original file back.
+  Verify (mechanical): Confirm `npx jest` in `sample-target/` exits non-zero before the run. POST the sample crash and confirm the formulating line, a second Jest exit of zero, and a changed target file. POST a target whose Jest suite already passes and confirm `[DevLens Agent] Error: Unable to replicate crash with existing test suite.` and that the target file is unchanged.
+  Learner check: Trigger the sample crash and confirm the terminal shows the replicate line, the formulating line, and a target file whose Jest suite now passes.
+  Commit: `Verify crash with Jest and apply stubbed discount patch`
 
 - [ ] **3. A passing re-run opens one GitHub pull request, or logs the credential error and stops**
   Becomes usable: After the second Jest run passes, DevLens opens one pull request on a new branch and prints its URL, or prints the credential error and opens nothing. The pull request body includes the issue, the root cause, and the passing Jest output.
@@ -61,3 +61,6 @@ Reflection: not started
 Activity mode: not started
 
 ## Revisions
+
+- Patch generation is a labeled stub of the sample discount fix instead of a live GPT-4o call — OpenAI returned `credit_balance_exhausted`, and the learner chose not to add credits.
+- The early hands-on pause after slice 2 was skipped — the learner asked to commit the stub and proceed immediately to Slice 3.
