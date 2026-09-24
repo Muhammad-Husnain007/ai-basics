@@ -2,6 +2,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { Octokit } from "@octokit/rest";
+import { applyDiscountFix } from "./generatePatch.js";
 
 function git(command, cwd) {
   return execSync(`git ${command}`, {
@@ -64,6 +65,7 @@ export async function openPullRequest({
   });
 
   let sha;
+  let baseText = null;
   try {
     const existing = await octokit.rest.repos.getContent({
       owner,
@@ -71,9 +73,27 @@ export async function openPullRequest({
       path: relativePath,
       ref: branch,
     });
-    if (!Array.isArray(existing.data)) sha = existing.data.sha;
+    if (!Array.isArray(existing.data)) {
+      sha = existing.data.sha;
+      baseText = Buffer.from(existing.data.content, "base64").toString("utf8");
+    }
   } catch (error) {
     if (error.status !== 404) throw error;
+  }
+
+  // Patch the GitHub base file in place so the PR diff is only the bug line,
+  // not a full local rewrite (avoids CRLF/whole-file churn).
+  let nextText;
+  if (baseText !== null) {
+    const patched = applyDiscountFix(baseText);
+    if (!patched.changed) {
+      const error = new Error("Remote file has no bug line to patch");
+      error.code = "GITHUB_PATCH";
+      throw error;
+    }
+    nextText = patched.content;
+  } else {
+    nextText = fs.readFileSync(filePath, "utf8");
   }
 
   await octokit.rest.repos.createOrUpdateFileContents({
@@ -81,7 +101,7 @@ export async function openPullRequest({
     repo,
     path: relativePath,
     message: `Fix ${message || "crash"}`,
-    content: Buffer.from(fs.readFileSync(filePath, "utf8")).toString("base64"),
+    content: Buffer.from(nextText, "utf8").toString("base64"),
     branch,
     sha,
   });
