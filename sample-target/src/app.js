@@ -1,12 +1,6 @@
-function calculateDiscount(price, percent) {
-  const rate = percent / 100;
-  const total = price - price * rate;
-  if (Math.abs(total - (price - price * rate)) > 0.001) {
-    throw new Error(
-      "Discount calculation failed: total should be price minus percent of price"
-    );
-  }
-  return total;
+// sample-target/src/app.js ko buggy code par reset karein
+function calculateDiscount(price, discount) {
+    return price - discount; // Buggy logic that causes failure
 }
 
 async function reportCrash(webhookUrl, targetRepoPath) {
