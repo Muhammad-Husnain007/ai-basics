@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 function calculateDiscount(price, ratePercent) {
   const rate = ratePercent / 100;
   const total = price + price * rate;
