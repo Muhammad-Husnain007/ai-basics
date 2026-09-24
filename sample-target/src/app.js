@@ -1,6 +1,10 @@
-// sample-target/src/app.js ko buggy code par reset karein
-function calculateDiscount(price, discount) {
-    return price - discount; // Buggy logic that causes failure
+function calculateDiscount(price, ratePercent) {
+  const rate = ratePercent / 100;
+  const total = price - price * rate;
+  if (total < 0) {
+    throw new Error("Calculated negative total");
+  }
+  return total;
 }
 
 async function reportCrash(webhookUrl, targetRepoPath) {
