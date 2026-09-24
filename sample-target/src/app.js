@@ -1,6 +1,6 @@
 function calculateDiscount(price, percent) {
   const rate = percent / 100;
-  const total = price + price * rate;
+  const total = price - price * rate;
   if (Math.abs(total - (price - price * rate)) > 0.001) {
     throw new Error(
       "Discount calculation failed: total should be price minus percent of price"

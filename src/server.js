@@ -33,7 +33,11 @@ export function createApp() {
   app.use(express.json());
 
   app.post("/webhook/crash", async (req, res) => {
-    const { errorName, message, stack, targetRepoPath } = req.body ?? {};
+    const body = req.body ?? {};
+    const errorName = body.errorName ?? body.error?.name;
+    const message = body.message ?? body.error?.message;
+    const stack = body.stack ?? body.error?.stack;
+    const targetRepoPath = body.targetRepoPath;
     console.log("[DevLens Agent] Crash Received.");
 
     const parsed = parseStack(stack, targetRepoPath);
