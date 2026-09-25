@@ -72,19 +72,19 @@ export function createApp() {
       original = result.original;
       if (!result.applied) {
         console.log("[DevLens Agent] Error: Generated fix failed unit tests. Aborting PR creation.");
-        res.status(200).json({ aborted: "fix" });
+        res.status(200).json({ aborted: "verify" });
         return;
       }
 
       const second = runTests(targetRepoPath);
       if (second.exitCode !== 0) {
-        restoreFile(parsed.filePath, original);
         console.log("[DevLens Agent] Error: Generated fix failed unit tests. Aborting PR creation.");
-        res.status(200).json({ aborted: "fix" });
+        res.status(200).json({ aborted: "verify" });
         return;
       }
 
       try {
+        // PR patches GitHub only; local bug is restored in finally.
         const pullRequestUrl = await openPullRequest({
           targetRepoPath,
           filePath: parsed.filePath,
@@ -102,9 +102,11 @@ export function createApp() {
         res.status(200).json({ aborted: "github" });
       }
     } catch {
-      if (original !== null) restoreFile(parsed.filePath, original);
       console.log("[DevLens Agent] Error: Generated fix failed unit tests. Aborting PR creation.");
-      res.status(200).json({ aborted: "fix" });
+      res.status(200).json({ aborted: "verify" });
+    } finally {
+      // Temp patch was only for Jest — keep local buggy for your push/demo loop.
+      if (original !== null) restoreFile(parsed.filePath, original);
     }
   });
 
