@@ -1,6 +1,6 @@
 function calculateDiscount(price, ratePercent) {
   const rate = ratePercent / 100;
-  const total = price + price * rate;
+  const total = price - price * rate;
   if (total < 0) {
     throw new Error("Calculated negative total");
   }
