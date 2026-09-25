@@ -6,7 +6,6 @@ function calculateDiscount(price, ratePercent) {
   }
   return total;
 }
-================= 
 async function reportCrash(webhookUrl, targetRepoPath) {
   try {
     calculateDiscount(100, 10);
